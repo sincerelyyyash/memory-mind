@@ -104,7 +104,7 @@ townsquare-assignment/
 
 ### 1. Clone and Install
 ```bash
-git clone <repository-url>
+git clone https://github.com/sincerelyyyash/townsquare-assignment
 cd townsquare-assignment
 
 # Install dependencies
@@ -220,58 +220,15 @@ Open [http://localhost:3000](http://localhost:3000) to start chatting!
 - **Memory Isolation**: Facts isolated by user ID
 - **Data Sanitization**: All inputs sanitized before processing
 
-## 🚀 Deployment
-
-### Vercel (Next.js App)
-```bash
-cd next-app
-npm run build
-vercel deploy
-```
-
-### Railway/Heroku (MCP Server)
-```bash
-cd mcp-server
-npm run build
-# Deploy to your preferred platform
-```
-
 ### Environment Variables
 Ensure all environment variables are configured in your deployment platform.
 
-## 🧪 Testing
-
-### Manual Testing Flow
-1. Start both servers
-2. Open chat interface
-3. Send: "I live in San Francisco and work as a software engineer"
-4. Check facts sidebar - should show extracted facts
-5. Send: "What's the weather like?"
-6. AI should reference San Francisco in response
-7. Test fact editing and deletion in sidebar
 
 ### Debug Mode
 Set `NODE_ENV=development` to see detailed logging of memory operations.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
 
-
-- **Google Gemini** - Advanced AI capabilities
-- **Anthropic** - MCP protocol specification
-- **Vercel** - Next.js framework and deployment platform
-
----
-
-**Built with ❤️ for the future of memory-aware AI conversations**
