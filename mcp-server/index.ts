@@ -1,161 +1,466 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { z } from 'zod';
 import express from 'express';
-import cors from 'cors';
-import router, { initializeDatabase } from './src/routes.js';
+import { randomUUID } from 'crypto';
+import { FactDatabase } from './src/database.js';
+import type { CreateFact, UpdateFact, Fact } from './src/types.js';
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+// Initialize database
+const db = new FactDatabase();
 
-// Parse allowed origins from environment variable
-const getAllowedOrigins = (): string[] => {
-  const origins = process.env.ALLOWED_ORIGINS || 'http://localhost:3000';
-  return origins.split(',').map(origin => origin.trim());
-};
-
-// CORS configuration
-const corsOptions = {
-  origin: (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = getAllowedOrigins();
-    
-    // Allow requests with no origin (like mobile apps or Postman)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-};
-
-// Middleware
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Request logging middleware
-app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`${timestamp} - ${req.method} ${req.path}`);
-  next();
+// Create MCP server
+const server = new McpServer({
+  name: 'memory-context-server',
+  version: '1.0.0',
 });
 
-// API routes
-app.use('/', router);
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    name: 'MCP Server',
-    version: '1.0.0',
-    description: 'Model Context Protocol server for AI chat memory management',
-    endpoints: {
-      health: 'GET /health',
-      createFact: 'POST /context',
-      getFacts: 'GET /context',
-      getFactById: 'GET /context/:id',
-      updateFact: 'PUT /context/:id',
-      deleteFact: 'DELETE /context/:id',
-      deleteUserFacts: 'DELETE /context/user/:userId',
-      getUserSummary: 'GET /context/user/:userId/summary',
+// Register fact management tools
+server.registerTool(
+  'create-fact',
+  {
+    title: 'Create Fact',
+    description: 'Create a new fact in memory',
+    inputSchema: {
+      subject: z.string().describe('The subject of the fact'),
+      predicate: z.string().describe('The predicate/relationship'),
+      object: z.string().describe('The object/value'),
+      userId: z.string().describe('User ID'),
     },
-    documentation: 'See README.md for detailed API documentation',
-  });
-});
+  },
+  async ({ subject, predicate, object, userId }) => {
+    try {
+      const fact = await db.createFact({
+        subject,
+        predicate,
+        object,
+        userId,
+        timestamp: new Date().toISOString(),
+      });
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.method} ${req.originalUrl} not found`,
-    availableEndpoints: [
-      'GET /',
-      'GET /health',
-      'POST /context',
-      'GET /context',
-      'GET /context/:id',
-      'PUT /context/:id',
-      'DELETE /context/:id',
-      'DELETE /context/user/:userId',
-      'GET /context/user/:userId/summary',
-    ],
-  });
-});
-
-// Global error handler
-app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Global error handler:', error);
-  
-  if (error.message === 'Not allowed by CORS') {
-    return res.status(403).json({
-      error: 'CORS Error',
-      message: 'Origin not allowed',
-    });
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Created fact: ${fact.subject} ${fact.predicate} ${fact.object}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error creating fact: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   }
+);
 
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
-  });
-});
+server.registerTool(
+  'get-facts',
+  {
+    title: 'Get Facts',
+    description: 'Retrieve facts for a user',
+    inputSchema: {
+      userId: z.string().describe('User ID'),
+      subject: z.string().optional().describe('Filter by subject'),
+      predicate: z.string().optional().describe('Filter by predicate'),
+      limit: z.number().optional().describe('Maximum number of facts to return'),
+    },
+  },
+  async ({ userId, subject, predicate, limit }) => {
+    try {
+      const query: any = { userId };
+      if (subject) query.subject = subject;
+      if (predicate) query.predicate = predicate;
+      if (limit) query.limit = limit;
 
-// Make server variable available for graceful shutdown
-let server: any;
+      const { facts } = await db.getFacts(query);
 
-// Graceful shutdown
-const gracefulShutdown = (signal: string) => {
-  console.log(`
-${signal} received. Shutting down gracefully...`);
-  
-  if (server) {
-    server.close(() => {
-      console.log('HTTP server closed');
-      process.exit(0);
-    });
-  } else {
-    console.log('No server to close');
-    process.exit(0);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              userId,
+              facts,
+              totalCount: facts.length,
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error retrieving facts: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
   }
+);
 
-  // Force close after 10 seconds
-  setTimeout(() => {
-    console.log('Forcing shutdown...');
-    process.exit(1);
-  }, 10000);
-};
+server.registerTool(
+  'update-fact',
+  {
+    title: 'Update Fact',
+    description: 'Update an existing fact',
+    inputSchema: {
+      id: z.string().describe('Fact ID'),
+      subject: z.string().optional().describe('New subject'),
+      predicate: z.string().optional().describe('New predicate'),
+      object: z.string().optional().describe('New object'),
+    },
+  },
+  async ({ id, subject, predicate, object }) => {
+    try {
+      const updates: UpdateFact = {};
+      if (subject) updates.subject = subject;
+      if (predicate) updates.predicate = predicate;
+      if (object) updates.object = object;
 
-// Start server
-const startServer = async () => {
+      const fact = await db.updateFact(id, updates);
+      
+      if (!fact) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Fact with ID ${id} not found`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Updated fact: ${fact.subject} ${fact.predicate} ${fact.object}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error updating fact: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  'delete-fact',
+  {
+    title: 'Delete Fact',
+    description: 'Delete a fact from memory',
+    inputSchema: {
+      id: z.string().describe('Fact ID'),
+    },
+  },
+  async ({ id }) => {
+    try {
+      const deleted = await db.deleteFact(id);
+      
+      if (!deleted) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Fact with ID ${id} not found`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Deleted fact with ID: ${id}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error deleting fact: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Register memory context resource
+server.registerResource(
+  'memory-context',
+  'memory://context/{userId}',
+  {
+    title: 'Memory Context',
+    description: 'User memory context as a structured knowledge graph',
+    mimeType: 'application/json',
+  },
+  async (uri) => {
+    try {
+      // Extract userId from URI
+      const match = uri.href.match(/memory:\/\/context\/(.+)/);
+      if (!match) {
+        throw new Error('Invalid memory context URI format');
+      }
+      
+      const userId = decodeURIComponent(match[1]);
+      const { facts } = await db.getFacts({ userId });
+
+      const memoryContext = {
+        userId,
+        facts,
+        totalCount: facts.length,
+        timestamp: new Date().toISOString(),
+      };
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify(memoryContext, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({
+              error: error instanceof Error ? error.message : 'Unknown error',
+              userId: 'unknown',
+              facts: [],
+              totalCount: 0,
+            }, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  }
+);
+
+// Register facts summary resource
+server.registerResource(
+  'facts-summary',
+  'memory://summary/{userId}',
+  {
+    title: 'Facts Summary',
+    description: 'Summary of user facts by predicate',
+    mimeType: 'application/json',
+  },
+  async (uri) => {
+    try {
+      // Extract userId from URI
+      const match = uri.href.match(/memory:\/\/summary\/(.+)/);
+      if (!match) {
+        throw new Error('Invalid facts summary URI format');
+      }
+      
+      const userId = decodeURIComponent(match[1]);
+      const summary = await db.getUserFactsSummary(userId);
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({
+              userId,
+              ...summary,
+              timestamp: new Date().toISOString(),
+            }, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            text: JSON.stringify({
+              error: error instanceof Error ? error.message : 'Unknown error',
+              userId: 'unknown',
+              predicateCount: {},
+              totalFacts: 0,
+            }, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+      };
+    }
+  }
+);
+
+// HTTP server setup for Streamable HTTP transport
+async function setupHttpServer(port: number = 3001) {
+  const app = express();
+  app.use(express.json());
+  
+  // CORS headers for Next.js app
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, mcp-session-id');
+    res.header('Access-Control-Expose-Headers', 'mcp-session-id');
+    
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+    next();
+  });
+
+  // Store transports by session ID
+  const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+
+  // Handle MCP requests
+  app.all('/mcp', async (req, res) => {
+    try {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      let transport: StreamableHTTPServerTransport;
+
+      if (sessionId && transports[sessionId]) {
+        // Reuse existing transport
+        transport = transports[sessionId];
+      } else {
+        // Create new transport
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sessionId) => {
+            transports[sessionId] = transport;
+          },
+          enableDnsRebindingProtection: false, // Disable for local development
+        });
+
+        // Clean up transport when closed
+        transport.onclose = () => {
+          if (transport.sessionId) {
+            delete transports[transport.sessionId];
+          }
+        };
+
+        // Connect MCP server to transport
+        await server.connect(transport);
+      }
+
+      // Handle the request
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      console.error('Error handling MCP request:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Internal server error',
+          },
+          id: null,
+        });
+      }
+    }
+  });
+
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      server: 'MCP Memory Context Server',
+      version: '1.0.0',
+    });
+  });
+
+  // Start HTTP server
+  const httpServer = app.listen(port, () => {
+    console.log(`MCP Server running on HTTP transport at http://localhost:${port}`);
+    console.log(`MCP endpoint: http://localhost:${port}/mcp`);
+    console.log(`Health check: http://localhost:${port}/health`);
+  });
+
+  return httpServer;
+}
+
+// Main function to start the server
+async function main() {
   try {
     // Initialize database connection
-    await initializeDatabase();
-    
-    // Start HTTP server
-    server = app.listen(PORT, () => {
-      console.log('\nMCP Server started successfully!');
-      console.log(`Server running on port: ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log('\nReady to accept requests...\n');
-    });
+    await db.connect();
+    console.log('Database connected successfully');
 
-    // Handle graceful shutdown
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    
-    return server;
+    // Get transport type from command line arguments
+    const transportType = process.argv[2] || 'stdio';
+    const port = parseInt(process.env.PORT || '3001');
+
+    if (transportType === 'streamable-http') {
+      // Start HTTP server for Next.js app
+      const httpServer = await setupHttpServer(port);
+      
+      // Handle graceful shutdown
+      process.on('SIGINT', async () => {
+        console.log('\nShutting down MCP HTTP server...');
+        httpServer.close(() => {
+          console.log('HTTP server closed');
+        });
+        await db.disconnect();
+        process.exit(0);
+      });
+
+    } else {
+      // Default stdio transport for CLI tools
+      const stdioTransport = new StdioServerTransport();
+      await server.connect(stdioTransport);
+      console.log('MCP Server running on stdio transport');
+      console.log('Ready to receive MCP messages via stdin/stdout');
+    }
+
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('Failed to start MCP server:', error);
     process.exit(1);
   }
-};
+}
 
-// Export for testing
-export { app };
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\nShutting down MCP server...');
+  await db.disconnect();
+  process.exit(0);
+});
 
-// Start server if this file is run directly
-const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
-if (isMainModule) {
-  startServer();
+process.on('SIGTERM', async () => {
+  console.log('\nShutting down MCP server...');
+  await db.disconnect();
+  process.exit(0);
+});
+
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
+  });
 }
