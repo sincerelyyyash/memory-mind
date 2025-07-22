@@ -386,14 +386,82 @@ async function setupHttpServer(port: number = 3001) {
     }
   });
 
-  // Health check endpoint
-  app.get('/health', (req, res) => {
-    res.json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      server: 'MCP Memory Context Server',
-      version: '1.0.0',
-    });
+  // Health check endpoint with comprehensive diagnostics
+  app.get('/health', async (req, res) => {
+    const startTime = Date.now();
+    
+    try {
+      // Check database health
+      const dbHealth = await db.healthCheck();
+      const responseTime = Date.now() - startTime;
+      
+      const healthStatus = {
+        status: dbHealth ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        server: 'MCP Memory Context Server',
+        version: '1.0.0',
+        components: {
+          database: {
+            status: dbHealth ? 'up' : 'down',
+            responseTimeMs: responseTime,
+          },
+          server: {
+            status: 'up',
+            uptime: process.uptime(),
+            memory: {
+              used: process.memoryUsage().heapUsed,
+              total: process.memoryUsage().heapTotal,
+              external: process.memoryUsage().external,
+              rss: process.memoryUsage().rss,
+            },
+          },
+          transports: {
+            activeConnections: Object.keys(transports).length,
+          },
+        },
+        responseTimeMs: responseTime,
+      };
+
+      // Set appropriate status code
+      const statusCode = dbHealth ? 200 : 503;
+      res.status(statusCode).json(healthStatus);
+      
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      console.error('❌ Health check error:', error);
+      
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        server: 'MCP Memory Context Server',
+        version: '1.0.0',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        responseTimeMs: responseTime,
+      });
+    }
+  });
+
+  // Performance metrics endpoint
+  app.get('/metrics', async (req, res) => {
+    try {
+      const uptime = process.uptime();
+      const memory = process.memoryUsage();
+      
+      res.json({
+        uptime: uptime,
+        memory: {
+          heapUsed: memory.heapUsed,
+          heapTotal: memory.heapTotal,
+          external: memory.external,
+          rss: memory.rss,
+        },
+        activeConnections: Object.keys(transports).length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('❌ Metrics error:', error);
+      res.status(500).json({ error: 'Failed to retrieve metrics' });
+    }
   });
 
   // Start HTTP server
