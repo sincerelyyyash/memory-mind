@@ -8,7 +8,6 @@ import { Message } from '@/types/message';
 import { Fact } from '@/types/fact';
 import { nanoid } from 'nanoid';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getMemoryContext } from '@/lib/mcp';
 import { Menu, X, Brain, RotateCcw } from 'lucide-react';
 
 // Constants for localStorage keys
@@ -100,9 +99,14 @@ export default function ChatPage() {
     if (!userId) return;
     
     try {
-      const memoryContext = await getMemoryContext(userId);
-      setFacts(memoryContext.facts || []);
-      console.log(`Loaded ${memoryContext.facts?.length || 0} facts`);
+      const response = await fetch(`/api/facts?userId=${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFacts(data.facts || []);
+        console.log(`💭 Loaded ${data.facts?.length || 0} facts`);
+      } else {
+        console.error('Failed to load facts:', await response.text());
+      }
     } catch (error) {
       console.error('Error loading facts:', error);
     }

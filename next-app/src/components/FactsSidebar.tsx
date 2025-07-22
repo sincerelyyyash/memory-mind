@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Fact } from '@/types/fact';
-import { updateFact, deleteFact } from '@/lib/mcp';
 import { Edit2, Trash2, Save, X, Plus } from 'lucide-react';
 
 interface FactsSidebarProps {
@@ -28,13 +27,24 @@ export const FactsSidebar = ({ facts, onFactUpdate }: FactsSidebarProps) => {
 
   const handleSave = async (factId: string) => {
     try {
-      const success = await updateFact(factId, editingFact);
-      if (success) {
+      const response = await fetch('/api/facts', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          factId,
+          ...editingFact,
+        }),
+      });
+
+      if (response.ok) {
         setEditingFactId(null);
         setEditingFact({});
         onFactUpdate();
       } else {
-        alert('Failed to update fact');
+        const errorData = await response.json();
+        alert(`Failed to update fact: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error updating fact:', error);
@@ -45,11 +55,19 @@ export const FactsSidebar = ({ facts, onFactUpdate }: FactsSidebarProps) => {
   const handleDelete = async (factId: string) => {
     setIsDeleting(factId);
     try {
-      const success = await deleteFact(factId);
-      if (success) {
+      const response = await fetch('/api/facts', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ factId }),
+      });
+
+      if (response.ok) {
         onFactUpdate();
       } else {
-        alert('Failed to delete fact');
+        const errorData = await response.json();
+        alert(`Failed to delete fact: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error deleting fact:', error);
