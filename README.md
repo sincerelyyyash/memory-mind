@@ -132,8 +132,8 @@ PORT=3001
 ### 3. Database Setup
 ```bash
 cd mcp-server
-npx prisma migrate dev
-npx prisma generate
+bunx prisma migrate dev
+bunx prisma generate
 ```
 
 ### 4. Start Services
