@@ -11,8 +11,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Brain, RotateCcw } from 'lucide-react';
 
 // Constants for localStorage keys
-const USER_ID_KEY = 'townsquare-memory-user-id';
-const SESSION_NAME_KEY = 'townsquare-memory-session-name';
+const USER_ID_KEY = 'memory-mind-user-id';
+const SESSION_NAME_KEY = 'memory-mind-session-name';
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);

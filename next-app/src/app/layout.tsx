@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "AI Chat with Memory - Townsquare Assignment",
+  title: "MemoryMind - AI Chat with Persistent Memory",
   description: "AI-powered chat application with persistent memory using Gemini 2.5 Flash, Redis, and MCP protocol",
 };
 

@@ -24,7 +24,7 @@
     "postinstall": "bunx prisma generate"
   },
   "keywords": ["mcp", "memory", "context", "ai", "chat", "sqlite", "express"],
-  "author": "Townsquare Assignment",
+      "author": "MemoryMind",
   "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",

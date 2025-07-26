@@ -1,4 +1,4 @@
-# AI Chat with Memory - Townsquare Assignment (MCP Implementation)
+# MemoryMind - AI Chat with Persistent Memory (MCP Implementation)
 
 A sophisticated AI chat application that combines Next.js, Gemini 2.5 Flash, and **actual MCP (Model Context Protocol)** to create memory-aware conversations. The AI remembers facts about users across sessions and provides personalized responses using proper MCP protocol implementation.
 
@@ -60,7 +60,7 @@ A sophisticated AI chat application that combines Next.js, Gemini 2.5 Flash, and
 ## 📦 Project Structure
 
 ```
-townsquare-assignment/
+memory-mind/
 ├── next-app/                  # Next.js frontend application
 │   ├── src/
 │   │   ├── app/
@@ -108,8 +108,8 @@ townsquare-assignment/
 
 ### 1. Clone and Install
 ```bash
-git clone https://github.com/sincerelyyyash/townsquare-assignment
-cd townsquare-assignment
+git clone https://github.com/sincerelyyyash/memory-mind
+cd memory-mind
 
 # Install dependencies
 cd next-app && bun install
