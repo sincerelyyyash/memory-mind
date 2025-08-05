@@ -1,14 +1,13 @@
 # MemoryMind - AI Chat with Persistent Memory (MCP Implementation)
 
-A sophisticated AI chat application that combines Next.js, Gemini 2.5 Flash, and **actual MCP (Model Context Protocol)** to create memory-aware conversations. The AI remembers facts about users across sessions and provides personalized responses using proper MCP protocol implementation.
+AI chat application that combines Next.js, Gemini 2.5 Flash, and **MCP (Model Context Protocol)** to create memory-aware conversations. The AI remembers facts about users across sessions and provides personalized responses using proper MCP protocol implementation.
 
 ## 🚀 Features
 
 ### ✨ Core Features
-- **Real MCP Implementation**: Uses official @modelcontextprotocol/sdk for true MCP compliance
+- **MCP Implementation**: Uses official @modelcontextprotocol/sdk for MCP compliance
 - **Memory-Aware Conversations**: AI remembers facts about users across sessions via MCP tools and resources
 - **Real-time Streaming**: Token-by-token response streaming
-- **Silver Aesthetic UI**: Beautiful dark theme with smooth animations
 - **Fact Management**: View, edit, and delete stored facts about yourself via MCP tools
 - **Persistent Storage**: Facts stored in PostgreSQL via MCP server tools
 - **Background Processing**: Automatic fact extraction without blocking conversations
@@ -32,7 +31,7 @@ A sophisticated AI chat application that combines Next.js, Gemini 2.5 Flash, and
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Next.js App   │────│   MCP Server    │────│   PostgreSQL    │
-│                 │    │  (Real MCP)     │    │                 │
+│                 │    │                 │    │                 │
 │ • Chat UI       │    │ • MCP Tools     │    │ • Facts DB      │
 │ • MCP Client    │    │ • MCP Resources │    │ • Persistence   │
 │ • Streaming     │    │ • HTTP Transport│    │                 │
@@ -212,7 +211,7 @@ The MCP server exposes the following tools for memory management:
 
 ## 🔧 MCP API Endpoints
 
-### MCP Server (Real MCP Protocol)
+### MCP Server (MCP Protocol)
 - **POST** `/mcp`: MCP protocol endpoint (StreamableHTTP transport)
 - **GET** `/health`: Health check
 
@@ -323,7 +322,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 This implementation replaces the previous REST API mimic with **actual MCP protocol**:
 
-1. **Real MCP Server**: Uses `@modelcontextprotocol/sdk` with proper MCP tools and resources
+1. **MCP Server**: Uses `@modelcontextprotocol/sdk` with proper MCP tools and resources
 2. **MCP Client**: Next.js app uses official MCP client with StreamableHTTP transport
 3. **Protocol Compliance**: Full JSON-RPC 2.0 MCP protocol implementation
 4. **Tool-based Operations**: Memory operations via MCP tools instead of REST endpoints
